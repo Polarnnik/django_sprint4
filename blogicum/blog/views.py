@@ -1,9 +1,9 @@
 from datetime import datetime
-
 from django.shortcuts import render, get_object_or_404
-
 from .models import Post, Category
-
+from .forms import PostForm
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse_lazy
 
 def posts():
     """Получение постов из БД"""
@@ -39,3 +39,15 @@ def category_posts(request, category_slug):
     context = {'category': category,
                'post_list': posts().filter(category=category)}
     return render(request, 'blog/category.html', context)
+
+
+class PostCreateView(LoginRequiredMixin, CreateView):
+    form_class = PostForm
+    template_name = 'blog/create.html'
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse_lazy('profile', kwargs={'username': self.request.user.username})
