@@ -62,6 +62,8 @@ TEMPLATES = [
     },
 ]
 
+CSRF_FAILURE_VIEW = 'pages.views.csrf_failure'
+
 WSGI_APPLICATION = 'blogicum.wsgi.application'
 
 
