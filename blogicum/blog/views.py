@@ -105,23 +105,21 @@ class PostDeleteView(LoginRequiredMixin, DeleteView):
         if post.author != request.user:
             return redirect('post_detail', id=post.id)
         return super().dispatch(request, *args, **kwargs)
-    
+
     def get_success_url(self):
         return reverse_lazy('blog:profile', kwargs={'username': self.object.author.username})
 
-class CommentCreateView(LoginRequiredMixin, CreateView):
-    model = Comment
-    form_class = CommentForm
-    template_name = 'blog/detail.html'
-
-    def form_valid(self, form):
-        post = get_object_or_404(Post, id=self.kwargs['post_id'])
-        form.instance.author = self.request.user
-        form.instance.post = post
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse_lazy('post_detail', kwargs={'id': self.kwargs['post_id']})
+@login_required
+def add_comment(request, post_id):
+    post = get_object_or_404(Post, id=post_id)
+    form = CommentForm(request.POST or None)
+    if form.is_valid():
+        comment = form.save(commit=False)
+        comment.author = request.user
+        comment.post = post
+        comment.save()
+    # Всегда перенаправляем обратно на страницу поста
+    return redirect('blog:post_detail', id=post_id)
 
 class CommentUpdateView(LoginRequiredMixin, UpdateView):
     model = Comment
