@@ -11,6 +11,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from django.views.generic import DetailView
 from .forms import CreationForm
+from django.db.models import Q
 
 def get_posts(user=None):
     queryset = Post.objects.select_related(
@@ -25,7 +26,24 @@ def get_posts(user=None):
     return queryset
 
 def index(request):
-    post_list = get_posts(request.user)
+    post_list = Post.objects.select_related(
+        'category', 'location', 'author'
+    ).filter(
+        category__is_published=True
+    )
+
+    if request.user.is_authenticated:
+        post_list = post_list.filter(
+            Q(is_published=True, pub_date__lte=timezone.now()) |
+            Q(author=request.user)
+        ).distinct()
+    else:
+        post_list = post_list.filter(
+            is_published=True, pub_date__lte=timezone.now()
+        )
+
+    post_list = post_list.order_by('-pub_date')
+
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -87,6 +105,9 @@ class PostDeleteView(LoginRequiredMixin, DeleteView):
         if post.author != request.user:
             return redirect('post_detail', id=post.id)
         return super().dispatch(request, *args, **kwargs)
+    
+    def get_success_url(self):
+        return reverse_lazy('blog:profile', kwargs={'username': self.object.author.username})
 
 class CommentCreateView(LoginRequiredMixin, CreateView):
     model = Comment
