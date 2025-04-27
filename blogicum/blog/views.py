@@ -6,6 +6,11 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from .models import Post, Category, Comment
 from .forms import PostForm, CommentForm
+from django.contrib.auth.models import User
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
+from django.views.generic import DetailView
+from .forms import CreationForm
 
 def get_posts(user=None):
     queryset = Post.objects.select_related(
@@ -96,3 +101,60 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
 
     def get_success_url(self):
         return reverse_lazy('post_detail', kwargs={'id': self.kwargs['post_id']})
+
+class CommentUpdateView(LoginRequiredMixin, UpdateView):
+    model = Comment
+    form_class = CommentForm
+    template_name = 'blog/comment_form.html'
+    pk_url_kwarg = 'comment_id'
+
+    def dispatch(self, request, *args, **kwargs):
+        comment = self.get_object()
+        if comment.author != request.user:
+            return redirect('post_detail', id=comment.post.id)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_success_url(self):
+        return reverse_lazy('post_detail', kwargs={'id': self.object.post.id})
+
+class CommentDeleteView(LoginRequiredMixin, DeleteView):
+    model = Comment
+    template_name = 'blog/comment_confirm_delete.html'
+    pk_url_kwarg = 'comment_id'
+
+    def dispatch(self, request, *args, **kwargs):
+        comment = self.get_object()
+        if comment.author != request.user:
+            return redirect('post_detail', id=comment.post.id)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_success_url(self):
+        return reverse_lazy('post_detail', kwargs={'id': self.object.post.id})
+
+
+@login_required
+def profile_redirect(request):
+    return redirect('users:profile', username=request.user.username)
+
+class SignUp(CreateView):
+    form_class = CreationForm
+    success_url = reverse_lazy('login')
+    template_name = 'registration/registration_form.html'
+
+User = get_user_model();
+
+class ProfileView(DetailView):
+    model = User
+    template_name = 'blog/user.html'
+    context_object_name = 'profile'
+    slug_field = 'username'
+    slug_url_kwarg = 'username'
+    paginate_by = 10
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        paginator = Paginator(self.object.posts.all(), self.paginate_by)
+        page_number = self.request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        context['page_obj'] = page_obj
+        return context
